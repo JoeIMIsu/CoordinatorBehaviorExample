@@ -2,142 +2,105 @@ package saulmm.myapplication;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.CoordinatorLayout;
-import android.support.v7.widget.Toolbar;
 import android.util.AttributeSet;
 import android.view.View;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
-@SuppressWarnings("unused")
 public class AvatarImageBehavior extends CoordinatorLayout.Behavior<CircleImageView> {
 
-    private final static float MIN_AVATAR_PERCENTAGE_SIZE   = 0.3f;
-    private final static int EXTRA_FINAL_AVATAR_PADDING     = 80;
+    // calculated from given layout
+    private int startXPositionImage;
+    private int startYPositionImage;
+    private int startHeight;
+    private int startToolbarHeight;
 
-    private final static String TAG = "behavior";
-    private Context mContext;
+    private boolean initialised = false;
 
-    private float mCustomFinalYPosition;
-    private float mCustomStartXPosition;
-    private float mCustomStartToolbarPosition;
-    private float mCustomStartHeight;
-    private float mCustomFinalHeight;
+    private float amountOfToolbarToMove;
+    private float amountOfImageToReduce;
+    private float amountToMoveXPosition;
+    private float amountToMoveYPosition;
 
-    private float mAvatarMaxSize;
-    private float mFinalLeftAvatarPadding;
-    private float mStartPosition;
-    private int mStartXPosition;
-    private float mStartToolbarPosition;
-    private int mStartYPosition;
-    private int mFinalYPosition;
-    private int mStartHeight;
-    private int mFinalXPosition;
-    private float mChangeBehaviorPoint;
+    // user configured params
+    private float finalToolbarHeight, finalXPosition, finalYPosition, finalHeight;
 
-    public AvatarImageBehavior(Context context, AttributeSet attrs) {
-        mContext = context;
+    public AvatarImageBehavior(
+            final Context context,
+            final AttributeSet attrs) {
 
         if (attrs != null) {
             TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.AvatarImageBehavior);
-            mCustomFinalYPosition = a.getDimension(R.styleable.AvatarImageBehavior_finalYPosition, 0);
-            mCustomStartXPosition = a.getDimension(R.styleable.AvatarImageBehavior_startXPosition, 0);
-            mCustomStartToolbarPosition = a.getDimension(R.styleable.AvatarImageBehavior_startToolbarPosition, 0);
-            mCustomStartHeight = a.getDimension(R.styleable.AvatarImageBehavior_startHeight, 0);
-            mCustomFinalHeight = a.getDimension(R.styleable.AvatarImageBehavior_finalHeight, 0);
-
+            finalXPosition = a.getDimension(R.styleable.AvatarImageBehavior_finalXPosition, 0);
+            finalYPosition = a.getDimension(R.styleable.AvatarImageBehavior_finalYPosition, 0);
+            finalHeight = a.getDimension(R.styleable.AvatarImageBehavior_finalHeight, 0);
+            finalToolbarHeight = a.getDimension(R.styleable.AvatarImageBehavior_finalToolbarHeight, 0);
             a.recycle();
         }
-
-        init();
-
-        mFinalLeftAvatarPadding = context.getResources().getDimension(
-            R.dimen.spacing_normal);
-    }
-
-    private void init() {
-        bindDimensions();
-    }
-
-    private void bindDimensions() {
-        mAvatarMaxSize = mContext.getResources().getDimension(R.dimen.image_width);
     }
 
     @Override
-    public boolean layoutDependsOn(CoordinatorLayout parent, CircleImageView child, View dependency) {
-        return dependency instanceof Toolbar;
+    public boolean layoutDependsOn(
+            final CoordinatorLayout parent,
+            final CircleImageView child,
+            final View dependency) {
+
+        return dependency instanceof AppBarLayout; // change if you want another sibling to depend on
     }
 
     @Override
-    public boolean onDependentViewChanged(CoordinatorLayout parent, CircleImageView child, View dependency) {
-        maybeInitProperties(child, dependency);
+    public boolean onDependentViewChanged(
+            final CoordinatorLayout parent,
+            final CircleImageView child,
+            final View dependency) {
 
-        final int maxScrollDistance = (int) (mStartToolbarPosition);
-        float expandedPercentageFactor = dependency.getY() / maxScrollDistance;
+        // make child (avatar) change in relation to dependency (toolbar) in both size and position, init with properties from layout
+        initProperties(child, dependency);
 
-        if (expandedPercentageFactor < mChangeBehaviorPoint) {
-            float heightFactor = (mChangeBehaviorPoint - expandedPercentageFactor) / mChangeBehaviorPoint;
+        // calculate progress of movement of dependency
+        float currentToolbarHeight = startToolbarHeight + dependency.getY(); // current expanded height of toolbar
+        // don't go below configured min height for calculations (it does go passed the toolbar)
+        currentToolbarHeight = currentToolbarHeight < finalToolbarHeight ? finalToolbarHeight : currentToolbarHeight;
+        final float amountAlreadyMoved = startToolbarHeight - currentToolbarHeight;
+        final float progress = 100 * amountAlreadyMoved / amountOfToolbarToMove; // how much % of expand we reached
 
-            float distanceXToSubtract = ((mStartXPosition - mFinalXPosition)
-                    * heightFactor) + (child.getHeight()/2);
-            float distanceYToSubtract = ((mStartYPosition - mFinalYPosition)
-                    * (1f - expandedPercentageFactor)) + (child.getHeight()/2);
+        // update image size
+        final float heightToSubtract = progress * amountOfImageToReduce / 100;
+        CoordinatorLayout.LayoutParams lp = (CoordinatorLayout.LayoutParams) child.getLayoutParams();
+        lp.width = (int) (startHeight - heightToSubtract);
+        lp.height = (int) (startHeight - heightToSubtract);
+        child.setLayoutParams(lp);
 
-            child.setX(mStartXPosition - distanceXToSubtract);
-            child.setY(mStartYPosition - distanceYToSubtract);
+        // update image position
+        final float distanceXToSubtract = progress * amountToMoveXPosition / 100;
+        final float distanceYToSubtract = progress * amountToMoveYPosition / 100;
+        float newXPosition = startXPositionImage - distanceXToSubtract;
+        //newXPosition = newXPosition < endXPosition ? endXPosition : newXPosition; // don't go passed end position
+        child.setX(newXPosition);
+        child.setY(startYPositionImage - distanceYToSubtract);
 
-            float heightToSubtract = ((mStartHeight - mCustomFinalHeight) * heightFactor);
-
-            CoordinatorLayout.LayoutParams lp = (CoordinatorLayout.LayoutParams) child.getLayoutParams();
-            lp.width = (int) (mStartHeight - heightToSubtract);
-            lp.height = (int) (mStartHeight - heightToSubtract);
-            child.setLayoutParams(lp);
-        } else {
-            float distanceYToSubtract = ((mStartYPosition - mFinalYPosition)
-                    * (1f - expandedPercentageFactor)) + (mStartHeight/2);
-
-            child.setX(mStartXPosition - child.getWidth()/2);
-            child.setY(mStartYPosition - distanceYToSubtract);
-
-            CoordinatorLayout.LayoutParams lp = (CoordinatorLayout.LayoutParams) child.getLayoutParams();
-            lp.width = (int) (mStartHeight);
-            lp.height = (int) (mStartHeight);
-            child.setLayoutParams(lp);
-        }
         return true;
     }
 
-    private void maybeInitProperties(CircleImageView child, View dependency) {
-        if (mStartYPosition == 0)
-            mStartYPosition = (int) (dependency.getY());
+    private void initProperties(
+            final CircleImageView child,
+            final View dependency) {
 
-        if (mFinalYPosition == 0)
-            mFinalYPosition = (dependency.getHeight() /2);
-
-        if (mStartHeight == 0)
-            mStartHeight = child.getHeight();
-
-        if (mStartXPosition == 0)
-            mStartXPosition = (int) (child.getX() + (child.getWidth() / 2));
-
-        if (mFinalXPosition == 0)
-            mFinalXPosition = mContext.getResources().getDimensionPixelOffset(R.dimen.abc_action_bar_content_inset_material) + ((int) mCustomFinalHeight / 2);
-
-        if (mStartToolbarPosition == 0)
-            mStartToolbarPosition = dependency.getY();
-
-        if (mChangeBehaviorPoint == 0) {
-            mChangeBehaviorPoint = (child.getHeight() - mCustomFinalHeight) / (2f * (mStartYPosition - mFinalYPosition));
+        if (!initialised) {
+            // form initial layout
+            startHeight = child.getHeight();
+            startXPositionImage = (int) child.getX();
+            startYPositionImage = (int) child.getY();
+            startToolbarHeight = dependency.getHeight();
+            // some calculated fields
+            amountOfToolbarToMove = startToolbarHeight - finalToolbarHeight;
+            amountOfImageToReduce = startHeight - finalHeight;
+            amountToMoveXPosition = startXPositionImage - finalXPosition;
+            amountToMoveYPosition = startYPositionImage - finalYPosition;
+            initialised = true;
         }
     }
 
-    public int getStatusBarHeight() {
-        int result = 0;
-        int resourceId = mContext.getResources().getIdentifier("status_bar_height", "dimen", "android");
-
-        if (resourceId > 0) {
-            result = mContext.getResources().getDimensionPixelSize(resourceId);
-        }
-        return result;
-    }
 }
