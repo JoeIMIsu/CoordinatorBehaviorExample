@@ -2,8 +2,8 @@
 
 ### Adapted screenshots
 
-![](https://github.com/hanscappelle/CoordinatorBehaviorExample/art/Screenshot_1497529975.png?raw=true)
-![](https://github.com/hanscappelle/CoordinatorBehaviorExample/art/Screenshot_1497529978.png?raw=true)
+![](https://github.com/hanscappelle/CoordinatorBehaviorExample/blob/master/art/Screenshot_1497529975.png?raw=true)
+![](https://github.com/hanscappelle/CoordinatorBehaviorExample/blob/master/art/Screenshot_1497529978.png?raw=true)
 
 ### Original gif showing the animation
 
